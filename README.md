@@ -636,7 +636,7 @@ susumi-smart-contracts/
 | Contract         | Address                                                                                                                              | Verified |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------- |
 | SusumiPioneerNFT | [`0xd8B76474e00AAac540D4d9EB0b828e303320E6E5`](https://amoy.polygonscan.com/address/0xd8B76474e00AAac540D4d9EB0b828e303320E6E5#code) | ✅        |
-| SusumiLaunchpad  | [`0x052006c5AA967f30C9ad3443809816cCa18A47E2`](https://amoy.polygonscan.com/address/0x052006c5AA967f30C9ad3443809816cCa18A47E2#code) | ✅        |
+| SusumiLaunchpad  | [`0xc14062662Eeb45439e544BAD8a160201558F51E1`](https://amoy.polygonscan.com/address/0xc14062662Eeb45439e544BAD8a160201558F51E1#code) | ✅        |
 | MockUSDT         | [`0xe64CBB5eF8B421f42B3d7c7360914c1b851Bd20b`](https://amoy.polygonscan.com/address/0xe64CBB5eF8B421f42B3d7c7360914c1b851Bd20b#code) | ✅        |
 | MockUSDC         | [`0x604c89DB73DF4a2f62B736146A080094Bf47a08e`](https://amoy.polygonscan.com/address/0x604c89DB73DF4a2f62B736146A080094Bf47a08e#code) | ✅        |
 
