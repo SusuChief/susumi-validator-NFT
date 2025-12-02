@@ -17,6 +17,7 @@ Smart contracts for the Susumi Validator NFT Pre-Sale Launchpad with dynamic pri
 - [Events](#events)
 - [Network Configuration](#network-configuration)
 - [Project Structure](#project-structure)
+- [Deployed Contracts](#deployed-contracts)
 
 ## 🎯 Overview
 
@@ -110,20 +111,20 @@ Launchpad contract for Validator NFT pre-sale with dynamic pricing and SUSU+ ent
 
 **Pricing Phases:**
 
-| Tier | Phase | Supply Range | Price | SUSU+ Entitlement |
-|------|-------|--------------|-------|-------------------|
-| **Commander** | 1 | 1-1,125 | $250 | 250,000 |
-| | 2 | 1,126-2,250 | $300 | 200,000 |
-| | 3 | 2,251-3,375 | $350 | 150,000 |
-| | 4 | 3,376-4,500 | $400 | 100,000 |
-| **Counsellor** | 1 | 1-100 | $750 | 750,000 |
-| | 2 | 101-200 | $900 | 550,000 |
-| | 3 | 201-300 | $1,200 | 350,000 |
-| | 4 | 301-400 | $1,500 | 200,000 |
-| **Chancellor** | 1 | 1-25 | $2,500 | 2,500,000 |
-| | 2 | 26-50 | $3,200 | 1,900,000 |
-| | 3 | 51-75 | $4,000 | 1,300,000 |
-| | 4 | 76-100 | $5,000 | 900,000 |
+| Tier           | Phase | Supply Range | Price  | SUSU+ Entitlement |
+| -------------- | ----- | ------------ | ------ | ----------------- |
+| **Commander**  | 1     | 1-1,125      | $250   | 250,000           |
+|                | 2     | 1,126-2,250  | $300   | 200,000           |
+|                | 3     | 2,251-3,375  | $350   | 150,000           |
+|                | 4     | 3,376-4,500  | $400   | 100,000           |
+| **Counsellor** | 1     | 1-100        | $750   | 750,000           |
+|                | 2     | 101-200      | $900   | 550,000           |
+|                | 3     | 201-300      | $1,200 | 350,000           |
+|                | 4     | 301-400      | $1,500 | 200,000           |
+| **Chancellor** | 1     | 1-25         | $2,500 | 2,500,000         |
+|                | 2     | 26-50        | $3,200 | 1,900,000         |
+|                | 3     | 51-75        | $4,000 | 1,300,000         |
+|                | 4     | 76-100       | $5,000 | 900,000           |
 
 **Key Functions:**
 ```solidity
@@ -310,6 +311,31 @@ These are automatically deployed in test setup and provide sufficient tokens for
 1. Ensure you have sufficient funds for deployment
 2. Set up `.env` file with required variables
 3. Verify network configuration in `hardhat.config.js`
+
+### Deploy Mock Stablecoins (Testnet Only)
+
+For testnet deployments, deploy mock USDT and USDC contracts first:
+
+```bash
+npm run deploy:mocks -- --network testnet
+```
+
+**What happens:**
+1. Deploys `MockUSDT` contract (6 decimals, 1 billion initial supply)
+2. Deploys `MockUSDC` contract (6 decimals, 1 billion initial supply)
+3. Outputs addresses for use in Launchpad deployment
+
+**Save the token addresses** - you'll need them for Launchpad deployment:
+
+```bash
+# Add to .env file or export as environment variables
+export USDT_ADDRESS=0x...
+export USDC_ADDRESS=0x...
+```
+
+> **Note:** On mainnet, skip this step and use real token addresses:
+> - USDT (Polygon): `0xc2132D05D31c914a87C6611C10748AEb04B58e8F`
+> - USDC (Polygon): `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`
 
 ### Deploy NFT Contract
 
@@ -573,10 +599,11 @@ Update these in your `.env` file:
 
 **Polygon Mainnet:**
 - USDT: `0xc2132D05D31c914a87C6611C10748AEb04B58e8F`
-- USDC: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`
+- USDC: `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`
 
 **Polygon Amoy (Testnet):**
-- Use mock contracts or deploy test tokens
+- Deploy mock contracts using: `npm run deploy:mocks -- --network testnet`
+- Use the deployed mock addresses for `USDT_ADDRESS` and `USDC_ADDRESS`
 
 ## 📁 Project Structure
 
@@ -591,6 +618,7 @@ susumi-smart-contracts/
 │       └── MockUSDC.sol
 ├── scripts/
 │   └── deploy/
+│       ├── 00_deploy_mocks.js           # Mock stablecoins (testnet)
 │       ├── 01_deploy_nft_contract.js
 │       └── 02_deploy_launchpad_contract.js
 ├── test/
@@ -600,3 +628,23 @@ susumi-smart-contracts/
 ├── package.json                   # Dependencies
 └── README.md                      
 ```
+
+## 📍 Deployed Contracts
+
+### Polygon Amoy Testnet (Chain ID: 80002)
+
+| Contract         | Address                                                                                                                              | Verified |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| SusumiPioneerNFT | [`0xd8B76474e00AAac540D4d9EB0b828e303320E6E5`](https://amoy.polygonscan.com/address/0xd8B76474e00AAac540D4d9EB0b828e303320E6E5#code) | ✅        |
+| SusumiLaunchpad  | [`0x052006c5AA967f30C9ad3443809816cCa18A47E2`](https://amoy.polygonscan.com/address/0x052006c5AA967f30C9ad3443809816cCa18A47E2#code) | ✅        |
+| MockUSDT         | [`0xe64CBB5eF8B421f42B3d7c7360914c1b851Bd20b`](https://amoy.polygonscan.com/address/0xe64CBB5eF8B421f42B3d7c7360914c1b851Bd20b#code) | ✅        |
+| MockUSDC         | [`0x604c89DB73DF4a2f62B736146A080094Bf47a08e`](https://amoy.polygonscan.com/address/0x604c89DB73DF4a2f62B736146A080094Bf47a08e#code) | ✅        |
+
+### Polygon Mainnet (Chain ID: 137)
+
+| Contract         | Address                                                                                                                    | Verified |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- | -------- |
+| SusumiPioneerNFT | `TBD`                                                                                                                      | -        |
+| SusumiLaunchpad  | `TBD`                                                                                                                      | -        |
+| USDT             | [`0xc2132D05D31c914a87C6611C10748AEb04B58e8F`](https://polygonscan.com/address/0xc2132D05D31c914a87C6611C10748AEb04B58e8F) | ✅        |
+| USDC             | [`0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`](https://polygonscan.com/address/0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359) | ✅        |

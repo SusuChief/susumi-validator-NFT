@@ -3,6 +3,7 @@ const { ethers } = require("hardhat");
 
 describe("SusumiLaunchpad", function () {
   let nftContract, launchpad, usdt, usdc;
+  let nftContractAddress, launchpadAddress, usdtAddress, usdcAddress;
   let owner, treasury, user1, user2, user3;
 
   const COMMANDER_TOKEN_ID = 5001;
@@ -12,7 +13,7 @@ describe("SusumiLaunchpad", function () {
   const BASE_URI = "https://api.susumi.io/metadata/pioneer/";
 
   // Helper function to convert USD to token amount (6 decimals)
-  const usdToToken = (usd) => ethers.BigNumber.from(usd).mul(ethers.BigNumber.from(10).pow(6));
+  const usdToToken = (usd) => ethers.parseUnits(String(usd), 6);
 
   beforeEach(async function () {
     [owner, treasury, user1, user2, user3] = await ethers.getSigners();
@@ -20,31 +21,35 @@ describe("SusumiLaunchpad", function () {
     // Deploy mock USDT and USDC
     const MockUSDT = await ethers.getContractFactory("MockUSDT");
     usdt = await MockUSDT.deploy();
-    await usdt.deployed();
+    await usdt.waitForDeployment();
+    usdtAddress = await usdt.getAddress();
 
     const MockUSDC = await ethers.getContractFactory("MockUSDC");
     usdc = await MockUSDC.deploy();
-    await usdc.deployed();
+    await usdc.waitForDeployment();
+    usdcAddress = await usdc.getAddress();
 
     // Deploy NFT contract
     const SusumiPioneerNFT = await ethers.getContractFactory("SusumiPioneerNFT");
     nftContract = await SusumiPioneerNFT.deploy(owner.address, treasury.address, BASE_URI);
-    await nftContract.deployed();
+    await nftContract.waitForDeployment();
+    nftContractAddress = await nftContract.getAddress();
 
     // Deploy Launchpad
     const SusumiLaunchpad = await ethers.getContractFactory("SusumiLaunchpad");
     launchpad = await SusumiLaunchpad.deploy(
-      nftContract.address,
+      nftContractAddress,
       owner.address,
       treasury.address,
-      usdt.address,
-      usdc.address
+      usdtAddress,
+      usdcAddress
     );
-    await launchpad.deployed();
+    await launchpad.waitForDeployment();
+    launchpadAddress = await launchpad.getAddress();
 
     // Grant MINTER_ROLE to Launchpad
     const MINTER_ROLE = await nftContract.MINTER_ROLE();
-    await nftContract.grantRole(MINTER_ROLE, launchpad.address);
+    await nftContract.grantRole(MINTER_ROLE, launchpadAddress);
 
     // Give users some USDT and USDC (enough for large purchases)
     await usdt.mint(user1.address, usdToToken(1000000)); // $1M
@@ -60,7 +65,7 @@ describe("SusumiLaunchpad", function () {
 
   describe("Deployment", function () {
     it("Should set correct NFT contract address", async function () {
-      expect(await launchpad.nftContract()).to.equal(nftContract.address);
+      expect(await launchpad.nftContract()).to.equal(nftContractAddress);
     });
 
     it("Should set correct treasury", async function () {
@@ -68,8 +73,8 @@ describe("SusumiLaunchpad", function () {
     });
 
     it("Should accept USDT and USDC as payment tokens", async function () {
-      expect(await launchpad.acceptedPaymentTokens(usdt.address)).to.be.true;
-      expect(await launchpad.acceptedPaymentTokens(usdc.address)).to.be.true;
+      expect(await launchpad.acceptedPaymentTokens(usdtAddress)).to.be.true;
+      expect(await launchpad.acceptedPaymentTokens(usdcAddress)).to.be.true;
     });
 
     it("Should initialize default per-wallet limits", async function () {
@@ -109,17 +114,17 @@ describe("SusumiLaunchpad", function () {
       
       // Mint 1125 Commanders to reach phase 2 threshold using multiple users
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      const batchSize = 112;
+      const batchSize = 112n;
       const numBatches = 10;
-      const remainder = 5;
+      const remainder = 5n;
       
       // Approve and mint for each user
       for (let i = 0; i < numBatches; i++) {
-        await usdt.connect(user1).approve(launchpad.address, price.mul(batchSize));
-        await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, batchSize, usdt.address);
+        await usdt.connect(user1).approve(launchpadAddress, price * batchSize);
+        await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, batchSize, usdtAddress);
       }
-      await usdt.connect(user1).approve(launchpad.address, price.mul(remainder));
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, remainder, usdt.address);
+      await usdt.connect(user1).approve(launchpadAddress, price * remainder);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, remainder, usdtAddress);
 
       expect(await launchpad.getCurrentPhase(COMMANDER_TOKEN_ID)).to.equal(2);
       const newPrice = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
@@ -151,9 +156,9 @@ describe("SusumiLaunchpad", function () {
   describe("Minting", function () {
     it("Should mint NFT and track entitlement", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
 
       expect(await nftContract.balanceOf(user1.address, COMMANDER_TOKEN_ID)).to.equal(1);
       expect(await launchpad.pioneerSUSUPlusEntitlement(user1.address, COMMANDER_TOKEN_ID)).to.equal(250000);
@@ -163,20 +168,20 @@ describe("SusumiLaunchpad", function () {
     it("Should transfer payment to treasury", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
       const treasuryBalanceBefore = await usdt.balanceOf(treasury.address);
-      await usdt.connect(user1).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
 
       const treasuryBalanceAfter = await usdt.balanceOf(treasury.address);
-      expect(treasuryBalanceAfter.sub(treasuryBalanceBefore)).to.equal(price);
+      expect(treasuryBalanceAfter - treasuryBalanceBefore).to.equal(price);
     });
 
     it("Should mint multiple NFTs", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      const totalPrice = price.mul(5);
-      await usdt.connect(user1).approve(launchpad.address, totalPrice);
+      const totalPrice = price * 5n;
+      await usdt.connect(user1).approve(launchpadAddress, totalPrice);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 5, usdt.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 5, usdtAddress);
 
       expect(await nftContract.balanceOf(user1.address, COMMANDER_TOKEN_ID)).to.equal(5);
       expect(await launchpad.pioneerSUSUPlusEntitlement(user1.address, COMMANDER_TOKEN_ID)).to.equal(250000 * 5);
@@ -185,59 +190,60 @@ describe("SusumiLaunchpad", function () {
     it("Should not allow minting when sale is closed", async function () {
       await launchpad.connect(owner).setSaleOpen(false);
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
 
       await expect(
-        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address)
+        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress)
       ).to.be.reverted;
     });
 
     it("Should not allow minting with invalid token ID", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
 
       await expect(
-        launchpad.connect(user1).mintValidatorNFT(9999, 1, usdt.address)
+        launchpad.connect(user1).mintValidatorNFT(9999, 1, usdtAddress)
       ).to.be.reverted;
     });
 
     it("Should not allow minting with unaccepted payment token", async function () {
       const MockToken = await ethers.getContractFactory("MockUSDT");
       const fakeToken = await MockToken.deploy();
-      await fakeToken.deployed();
+      await fakeToken.waitForDeployment();
+      const fakeTokenAddress = await fakeToken.getAddress();
       await fakeToken.mint(user1.address, usdToToken(10000));
-      await fakeToken.connect(user1).approve(launchpad.address, usdToToken(10000));
+      await fakeToken.connect(user1).approve(launchpadAddress, usdToToken(10000));
 
       await expect(
-        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, fakeToken.address)
+        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, fakeTokenAddress)
       ).to.be.reverted;
     });
 
     it("Should enforce per-wallet limit", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      const totalPrice = price.mul(11); // Try to mint 11 (limit is 10)
-      await usdt.connect(user1).approve(launchpad.address, totalPrice);
+      const totalPrice = price * 11n; // Try to mint 11 (limit is 10)
+      await usdt.connect(user1).approve(launchpadAddress, totalPrice);
 
       await expect(
-        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 11, usdt.address)
+        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 11, usdtAddress)
       ).to.be.reverted;
     });
 
     it("Should enforce max supply", async function () {
       const price = await launchpad.getDynamicPrice(CHANCELLOR_TOKEN_ID);
-      const totalPrice = price.mul(101); // Try to mint 101 (max is 100)
-      await usdt.connect(user1).approve(launchpad.address, totalPrice);
+      const totalPrice = price * 101n; // Try to mint 101 (max is 100)
+      await usdt.connect(user1).approve(launchpadAddress, totalPrice);
 
       await expect(
-        launchpad.connect(user1).mintValidatorNFT(CHANCELLOR_TOKEN_ID, 101, usdt.address)
+        launchpad.connect(user1).mintValidatorNFT(CHANCELLOR_TOKEN_ID, 101, usdtAddress)
       ).to.be.reverted;
     });
 
     it("Should work with USDC", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdc.connect(user1).approve(launchpad.address, price);
+      await usdc.connect(user1).approve(launchpadAddress, price);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdc.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdcAddress);
 
       expect(await nftContract.balanceOf(user1.address, COMMANDER_TOKEN_ID)).to.equal(1);
     });
@@ -246,10 +252,10 @@ describe("SusumiLaunchpad", function () {
   describe("SUSU+ Entitlement Tracking", function () {
     it("Should track entitlement per user and token ID", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price.mul(2));
+      await usdt.connect(user1).approve(launchpadAddress, price * 2n);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
 
       expect(await launchpad.pioneerSUSUPlusEntitlement(user1.address, COMMANDER_TOKEN_ID)).to.equal(500000);
     });
@@ -258,10 +264,10 @@ describe("SusumiLaunchpad", function () {
       const commanderPrice = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
       const counsellorPrice = await launchpad.getDynamicPrice(COUNSELLOR_TOKEN_ID);
       
-      await usdt.connect(user1).approve(launchpad.address, commanderPrice.add(counsellorPrice));
+      await usdt.connect(user1).approve(launchpadAddress, commanderPrice + counsellorPrice);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
-      await launchpad.connect(user1).mintValidatorNFT(COUNSELLOR_TOKEN_ID, 1, usdt.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
+      await launchpad.connect(user1).mintValidatorNFT(COUNSELLOR_TOKEN_ID, 1, usdtAddress);
 
       expect(await launchpad.pioneerSUSUPlusEntitlement(user1.address, COMMANDER_TOKEN_ID)).to.equal(250000);
       expect(await launchpad.pioneerSUSUPlusEntitlement(user1.address, COUNSELLOR_TOKEN_ID)).to.equal(750000);
@@ -272,12 +278,12 @@ describe("SusumiLaunchpad", function () {
       const counsellorPrice = await launchpad.getDynamicPrice(COUNSELLOR_TOKEN_ID);
       const chancellorPrice = await launchpad.getDynamicPrice(CHANCELLOR_TOKEN_ID);
       
-      const totalPrice = commanderPrice.add(counsellorPrice).add(chancellorPrice);
-      await usdt.connect(user1).approve(launchpad.address, totalPrice);
+      const totalPrice = commanderPrice + counsellorPrice + chancellorPrice;
+      await usdt.connect(user1).approve(launchpadAddress, totalPrice);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
-      await launchpad.connect(user1).mintValidatorNFT(COUNSELLOR_TOKEN_ID, 1, usdt.address);
-      await launchpad.connect(user1).mintValidatorNFT(CHANCELLOR_TOKEN_ID, 1, usdt.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
+      await launchpad.connect(user1).mintValidatorNFT(COUNSELLOR_TOKEN_ID, 1, usdtAddress);
+      await launchpad.connect(user1).mintValidatorNFT(CHANCELLOR_TOKEN_ID, 1, usdtAddress);
 
       const totalEntitlement = await launchpad.getUserTotalEntitlement(user1.address);
       expect(totalEntitlement).to.equal(250000 + 750000 + 2500000);
@@ -289,22 +295,22 @@ describe("SusumiLaunchpad", function () {
       
       // Mint enough to reach phase 2 using multiple users
       const phase1Price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      const batchSize = 112;
+      const batchSize = 112n;
       const numBatches = 10;
-      const remainder = 5;
+      const remainder = 5n;
       
       // Mint 1125 to reach phase 2
       for (let i = 0; i < numBatches; i++) {
-        await usdt.connect(user1).approve(launchpad.address, phase1Price.mul(batchSize));
-        await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, batchSize, usdt.address);
+        await usdt.connect(user1).approve(launchpadAddress, phase1Price * batchSize);
+        await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, batchSize, usdtAddress);
       }
-      await usdt.connect(user1).approve(launchpad.address, phase1Price.mul(remainder));
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, remainder, usdt.address);
+      await usdt.connect(user1).approve(launchpadAddress, phase1Price * remainder);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, remainder, usdtAddress);
 
       // Now mint in phase 2
       const phase2Price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user2).approve(launchpad.address, phase2Price);
-      await launchpad.connect(user2).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
+      await usdt.connect(user2).approve(launchpadAddress, phase2Price);
+      await launchpad.connect(user2).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
 
       // User2 should get phase 2 entitlement (200,000)
       expect(await launchpad.pioneerSUSUPlusEntitlement(user2.address, COMMANDER_TOKEN_ID)).to.equal(200000);
@@ -314,16 +320,16 @@ describe("SusumiLaunchpad", function () {
   describe("Events", function () {
     it("Should emit NFTPurchased event", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
 
-      await expect(launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address))
+      await expect(launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress))
         .to.emit(launchpad, "NFTPurchased")
         .withArgs(
           user1.address,
           COMMANDER_TOKEN_ID,
           1,
           price,
-          usdt.address,
+          usdtAddress,
           1,
           250000
         );
@@ -331,9 +337,9 @@ describe("SusumiLaunchpad", function () {
 
     it("Should emit PioneerEntitlementAssigned event", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
 
-      await expect(launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address))
+      await expect(launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress))
         .to.emit(launchpad, "PioneerEntitlementAssigned")
         .withArgs(user1.address, COMMANDER_TOKEN_ID, 250000);
     });
@@ -343,15 +349,16 @@ describe("SusumiLaunchpad", function () {
     it("Should allow admin to set payment token", async function () {
       const MockToken = await ethers.getContractFactory("MockUSDT");
       const newToken = await MockToken.deploy();
-      await newToken.deployed();
+      await newToken.waitForDeployment();
+      const newTokenAddress = await newToken.getAddress();
 
-      await launchpad.connect(owner).setPaymentToken(newToken.address, true);
-      expect(await launchpad.acceptedPaymentTokens(newToken.address)).to.be.true;
+      await launchpad.connect(owner).setPaymentToken(newTokenAddress, true);
+      expect(await launchpad.acceptedPaymentTokens(newTokenAddress)).to.be.true;
     });
 
     it("Should not allow non-admin to set payment token", async function () {
       await expect(
-        launchpad.connect(user1).setPaymentToken(usdt.address, false)
+        launchpad.connect(user1).setPaymentToken(usdtAddress, false)
       ).to.be.reverted;
     });
 
@@ -362,7 +369,7 @@ describe("SusumiLaunchpad", function () {
 
     it("Should not allow setting zero address as treasury", async function () {
       await expect(
-        launchpad.connect(owner).setTreasury(ethers.constants.AddressZero)
+        launchpad.connect(owner).setTreasury(ethers.ZeroAddress)
       ).to.be.reverted;
     });
 
@@ -399,10 +406,10 @@ describe("SusumiLaunchpad", function () {
     it("Should allow admin to pause", async function () {
       await launchpad.connect(owner).pause();
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
 
       await expect(
-        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address)
+        launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress)
       ).to.be.reverted;
     });
 
@@ -411,8 +418,8 @@ describe("SusumiLaunchpad", function () {
       await launchpad.connect(owner).unpause();
       
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
+      await usdt.connect(user1).approve(launchpadAddress, price);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
       expect(await nftContract.balanceOf(user1.address, COMMANDER_TOKEN_ID)).to.equal(1);
     });
   });
@@ -426,8 +433,8 @@ describe("SusumiLaunchpad", function () {
       await launchpad.connect(owner).setMaxPerWallet(COMMANDER_TOKEN_ID, 200);
       
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price.mul(100));
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 100, usdt.address);
+      await usdt.connect(user1).approve(launchpadAddress, price * 100n);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 100, usdtAddress);
 
       const remainingAfter = await launchpad.getRemainingSupply(COMMANDER_TOKEN_ID);
       expect(remainingAfter).to.equal(4400);
@@ -441,34 +448,34 @@ describe("SusumiLaunchpad", function () {
       
       // Mint exactly at phase boundary
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      const batchSize = 112;
+      const batchSize = 112n;
       const numBatches = 10;
       
       // Mint 1124 (still phase 1)
       for (let i = 0; i < numBatches; i++) {
-        await usdt.connect(user1).approve(launchpad.address, price.mul(batchSize));
-        await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, batchSize, usdt.address);
+        await usdt.connect(user1).approve(launchpadAddress, price * batchSize);
+        await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, batchSize, usdtAddress);
       }
-      await usdt.connect(user1).approve(launchpad.address, price.mul(4));
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 4, usdt.address);
+      await usdt.connect(user1).approve(launchpadAddress, price * 4n);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 4, usdtAddress);
       
       expect(await launchpad.getCurrentPhase(COMMANDER_TOKEN_ID)).to.equal(1);
 
       // Mint 1 more to enter phase 2
-      await usdt.connect(user1).approve(launchpad.address, price);
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
+      await usdt.connect(user1).approve(launchpadAddress, price);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
       expect(await launchpad.getCurrentPhase(COMMANDER_TOKEN_ID)).to.equal(2);
     });
 
     it("Should allow multiple users to mint", async function () {
       const price = await launchpad.getDynamicPrice(COMMANDER_TOKEN_ID);
-      await usdt.connect(user1).approve(launchpad.address, price);
-      await usdt.connect(user2).approve(launchpad.address, price);
-      await usdt.connect(user3).approve(launchpad.address, price);
+      await usdt.connect(user1).approve(launchpadAddress, price);
+      await usdt.connect(user2).approve(launchpadAddress, price);
+      await usdt.connect(user3).approve(launchpadAddress, price);
 
-      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
-      await launchpad.connect(user2).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
-      await launchpad.connect(user3).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdt.address);
+      await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
+      await launchpad.connect(user2).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
+      await launchpad.connect(user3).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
 
       expect(await nftContract.balanceOf(user1.address, COMMANDER_TOKEN_ID)).to.equal(1);
       expect(await nftContract.balanceOf(user2.address, COMMANDER_TOKEN_ID)).to.equal(1);
@@ -477,4 +484,3 @@ describe("SusumiLaunchpad", function () {
     });
   });
 });
-

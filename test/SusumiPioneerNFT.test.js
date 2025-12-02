@@ -19,7 +19,7 @@ describe("SusumiPioneerNFT", function () {
       treasury.address,
       BASE_URI
     );
-    await nftContract.deployed();
+    await nftContract.waitForDeployment();
 
     // Grant MINTER_ROLE to minter
     const MINTER_ROLE = await nftContract.MINTER_ROLE();
@@ -59,7 +59,7 @@ describe("SusumiPioneerNFT", function () {
     it("Should revert with zero address in constructor", async function () {
       const SusumiPioneerNFT = await ethers.getContractFactory("SusumiPioneerNFT");
       await expect(
-        SusumiPioneerNFT.deploy(ethers.constants.AddressZero, treasury.address, BASE_URI)
+        SusumiPioneerNFT.deploy(ethers.ZeroAddress, treasury.address, BASE_URI)
       ).to.be.reverted;
     });
   });
@@ -263,4 +263,3 @@ describe("SusumiPioneerNFT", function () {
     });
   });
 });
-
