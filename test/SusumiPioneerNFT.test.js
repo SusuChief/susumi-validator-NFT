@@ -5,10 +5,11 @@ describe("SusumiPioneerNFT", function () {
   let nftContract;
   let owner, treasury, minter, user1, user2;
 
-  const BASE_URI = "https://api.susumi.io/metadata/pioneer/";
   const COMMANDER_TOKEN_ID = 5001;
   const COUNSELLOR_TOKEN_ID = 10001;
   const CHANCELLOR_TOKEN_ID = 12001;
+  
+  const BASE_URI = "https://gateway.pinata.cloud/ipfs/cid/";
 
   beforeEach(async function () {
     [owner, treasury, minter, user1, user2] = await ethers.getSigners();

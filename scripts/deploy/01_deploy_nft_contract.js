@@ -13,7 +13,7 @@ async function main() {
   // Deployment parameters
   const defaultAdmin = process.env.DEFAULT_ADMIN || deployer.address;
   const treasury = process.env.TREASURY || deployer.address;
-  const baseURI = process.env.BASE_URI || "https://api.susumi.io/metadata/pioneer/";
+  const baseURI = process.env.BASE_URI || "https://gateway.pinata.cloud/ipfs/cid/";
 
   console.log("\nDeployment parameters:");
   console.log("Default Admin:", defaultAdmin);
