@@ -10,7 +10,7 @@ describe("SusumiLaunchpad", function () {
   const COUNSELLOR_TOKEN_ID = 10001;
   const CHANCELLOR_TOKEN_ID = 12001;
 
-  const BASE_URI = "https://gateway.pinata.cloud/ipfs/cid/";
+  const BASE_URI = "https://gateway.pinata.cloud/ipfs/QmZtXU5vHrdtHpxckfHz4ZYQkE3qTqbhwNYCNkwdipARMj/";
 
   // Helper function to convert USD to token amount (6 decimals)
   const usdToToken = (usd) => ethers.parseUnits(String(usd), 6);
