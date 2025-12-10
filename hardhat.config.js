@@ -21,13 +21,13 @@ module.exports = {
       url: "http://127.0.0.1:8545",
     },
     testnet: {
-      url: "https://rpc-amoy.polygon.technology",
+      url: process.env.RPC_URL || "https://rpc-amoy.polygon.technology",
       chainId: 80002,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: 35000000000,
     },
     mainnet: {
-      url: process.env.POLYGON_RPC_URL || "https://polygon-rpc.com",
+      url: process.env.RPC_URL || "https://polygon-rpc.com",
       chainId: 137,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
