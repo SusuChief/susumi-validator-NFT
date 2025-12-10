@@ -10,11 +10,25 @@
     "deploy:nft": "npx hardhat run scripts/deploy/01_deploy_nft_contract.js --network",
     "deploy:launchpad": "npx hardhat run scripts/deploy/02_deploy_launchpad_contract.js --network",
     "deploy:all": "npm run deploy:mocks && npm run deploy:nft && npm run deploy:launchpad",
-    "verify": "npx hardhat verify"
+    "verify": "npx hardhat verify",
+    "update": "npx hardhat run scripts/update/index.js --network",
+    "update:uri": "npx hardhat run scripts/update/nft/set-base-uri.js --network",
+    "update:royalty": "npx hardhat run scripts/update/nft/update-royalty.js --network",
+    "update:roles": "npx hardhat run scripts/update/nft/manage-roles.js --network",
+    "update:treasury": "npx hardhat run scripts/update/launchpad/update-treasury.js --network",
+    "update:pricing": "npx hardhat run scripts/update/launchpad/update-pricing.js --network",
+    "update:sale": "npx hardhat run scripts/update/launchpad/manage-sale.js --network",
+    "update:limits": "npx hardhat run scripts/update/launchpad/update-wallet-limits.js --network",
+    "update:tokens": "npx hardhat run scripts/update/launchpad/manage-payment-tokens.js --network",
+    "emergency:pause": "npx hardhat run scripts/update/emergency/pause-all.js --network",
+    "emergency:unpause": "npx hardhat run scripts/update/emergency/unpause-all.js --network"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "winston": "^3.11.0"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
     "@nomicfoundation/hardhat-ethers": "^3.0.8",

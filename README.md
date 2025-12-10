@@ -144,6 +144,7 @@ npx hardhat compile
 RPC_URL=<YOUR_RPC_URL>
 PRIVATE_KEY=<YOUR_PRIVATE_KEY>
 ETHERSCAN_API_KEY=<YOUR_ETHERSCAN_API_KEY>
+REPORT_GAS=<YOUR_REPORT_GAS>
 
 # Deployment Configuration
 DEFAULT_ADMIN=<YOUR_DEFAULT_ADMIN>
@@ -154,8 +155,11 @@ BASE_URI=<YOUR_BASE_URI>
 USDT_ADDRESS=<YOUR_USDT_ADDRESS>
 USDC_ADDRESS=<YOUR_USDC_ADDRESS>
 
-# Pioneer NFT
+# PioneerNFT Contract
 NFT_CONTRACT_ADDRESS=<YOUR_NFT_CONTRACT_ADDRESS>
+
+# Launchpad Contract
+LAUNCHPAD_CONTRACT_ADDRESS=<YOUR_LAUNCHPAD_CONTRACT_ADDRESS>
 ```
 
 ## Testing
@@ -299,22 +303,54 @@ launchpad.on("PioneerEntitlementAssigned", (user, tokenId, entitlement) => {
 
 ```
 susumi-smart-contracts/
+├── audits/
 ├── contracts/
+│   ├── interfaces/
+│   │   ├── IERC1155Extensible.sol
+│   │   └── IERC20Extensible.sol
 │   ├── SusumiPioneerNFT.sol
 │   ├── SusumiLaunchpad.sol
 │   └── mocks/
 │       ├── MockUSDT.sol
 │       └── MockUSDC.sol
-├── scripts/deploy/
-│   ├── 00_deploy_mocks.js
-│   ├── 01_deploy_nft_contract.js
-│   └── 02_deploy_launchpad_contract.js
+├── scripts/
+│   ├── deploy/
+│   │   ├── 00_deploy_mocks.js
+│   │   ├── 01_deploy_nft_contract.js
+│   │   └── 02_deploy_launchpad_contract.js
+│   └── update/
+│       ├── README.md
+│       ├── index.js
+│       ├── config/
+│       │   └── contracts.config.js
+│       ├── helpers/
+│       │   ├── contract-loader.js
+│       │   ├── logger.js
+│       │   └── prompt.js
+│       ├── launchpad/
+│       │   ├── manage-payment-tokens.js
+│       │   ├── manage-sale.js
+│       │   ├── update-pricing.js
+│       │   ├── update-treasury.js
+│       │   └── update-wallet-limits.js
+│       ├── nft/
+│       │   ├── manage-roles.js
+│       │   ├── set-base-uri.js
+│       │   ├── update-rank-config.js
+│       │   └── update-royalty.js
+│       └── emergency/
+│           ├── pause-all.js
+│           └── unpause-all.js
 ├── test/
 │   ├── SusumiPioneerNFT.test.js
 │   └── SusumiLaunchpad.test.js
 ├── hardhat.config.js
-└── package.json
+├── package.json
+├── package-lock.json
+└── README.md
 ```
+
+See `scripts/update/README.md` for maintenance and admin task usage.
 
 ## Deployed Contracts
 
