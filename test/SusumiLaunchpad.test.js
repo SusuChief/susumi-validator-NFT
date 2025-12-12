@@ -422,6 +422,35 @@ describe("SusumiLaunchpad", function () {
       await launchpad.connect(user1).mintValidatorNFT(COMMANDER_TOKEN_ID, 1, usdtAddress);
       expect(await nftContract.balanceOf(user1.address, COMMANDER_TOKEN_ID)).to.equal(1);
     });
+
+    it("Should rescue ERC20 tokens to admin", async function () {
+      // send USDT to launchpad
+      await usdt.mint(launchpadAddress, usdToToken(1000));
+      const adminBalanceBefore = await usdt.balanceOf(owner.address);
+
+      await expect(launchpad.connect(owner).rescue(usdtAddress))
+        .to.emit(launchpad, "Rescue")
+        .withArgs(usdtAddress, usdToToken(1000));
+
+      const adminBalanceAfter = await usdt.balanceOf(owner.address);
+      expect(adminBalanceAfter - adminBalanceBefore).to.equal(usdToToken(1000));
+    });
+
+    it("Should rescue native balance to admin", async function () {
+      await ethers.provider.send("hardhat_setBalance", [
+        launchpadAddress,
+        "0x4563918244F40000", // 5 ETH
+      ]);
+      const adminBalanceBefore = BigInt(await ethers.provider.getBalance(owner.address));
+
+      const tx = await launchpad.connect(owner).rescue(ethers.ZeroAddress);
+      const receipt = await tx.wait();
+      const gasPrice = receipt.effectiveGasPrice ?? tx.gasPrice ?? 0;
+      const gasUsed = BigInt(receipt.gasUsed) * BigInt(gasPrice);
+      const adminBalanceAfter = BigInt(await ethers.provider.getBalance(owner.address));
+
+      expect(adminBalanceAfter + gasUsed - adminBalanceBefore).to.equal(5n * ethers.WeiPerEther);
+    });
   });
 
   describe("Supply Tracking", function () {

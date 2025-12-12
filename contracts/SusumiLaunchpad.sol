@@ -105,6 +105,7 @@ contract SusumiLaunchpad is AccessControl, Pausable, ReentrancyGuard {
     event TreasuryUpdated(address indexed newTreasury);
     event MaxPerWalletUpdated(uint256 indexed tokenId, uint256 newLimit);
     event SaleStatusUpdated(bool isOpen);
+    event Rescue(address token, uint256 amount);
 
     /**
      * @dev Constructor initializes launchpad with NFT contract, admin, and payment tokens
@@ -370,6 +371,23 @@ contract SusumiLaunchpad is AccessControl, Pausable, ReentrancyGuard {
     function setSaleOpen(bool isOpen) external onlyRole(ADMIN_ROLE) {
         saleOpen = isOpen;
         emit SaleStatusUpdated(isOpen);
+    }
+
+    /**
+     * @dev Rescue native or ERC20 tokens sent to the contract (admin only)
+     */
+    function rescue(address token) external onlyRole(ADMIN_ROLE) {
+        uint256 amount;
+        if (token == address(0)) {
+            bool success;
+            amount = address(this).balance;
+            (success, ) = address(_msgSender()).call{value: amount}("");
+        } else {
+            amount = IERC20(token).balanceOf(address(this));
+            require(amount > 0, "No tokens");
+            IERC20(token).safeTransfer(_msgSender(), amount);
+        }
+        emit Rescue(token, amount);
     }
 
     /**

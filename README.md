@@ -49,6 +49,12 @@ The system consists of two main contracts:
 | Counsellor |  10001   |    400     |   4    |
 | Chancellor |  12001   |    100     |   4    |
 
+### Supply Immutability
+
+- Max supplies are hard-coded constants in `SusumiPioneerNFT` (`COMMANDER_MAX_SUPPLY`, `COUNSELLOR_MAX_SUPPLY`, `CHANCELLOR_MAX_SUPPLY`) and exposed via `getMaxSupply(uint256 id)`.
+- These caps are immutable post-deployment; minting reverts if a mint would exceed the per-ID limit.
+- Indexers/marketplaces should read `getMaxSupply` for the authoritative per-ID cap.
+
 ### Dynamic Pricing
 
 | Tier           | Phase | Supply      |  Price | SUSU+ Entitlement |
@@ -216,6 +222,12 @@ await launchpad.setSaleOpen(true);
 await launchpad.acceptedPaymentTokens(usdtAddress); // true
 await launchpad.acceptedPaymentTokens(usdcAddress); // true
 ```
+
+### Supply Declaration (share with downstream teams)
+
+- Per-ID max supply: Commander 4,500 (`getMaxSupply(5001)`), Counsellor 400 (`getMaxSupply(10001)`), Chancellor 100 (`getMaxSupply(12001)`).
+- Caps are enforced on-chain and cannot be increased; no admin function exists to modify supply.
+- Include this note in deployment runbooks and public/partner docs for marketplaces and indexers.
 
 ### Verification
 

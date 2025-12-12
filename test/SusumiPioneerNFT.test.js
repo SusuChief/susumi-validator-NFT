@@ -166,6 +166,14 @@ describe("SusumiPioneerNFT", function () {
   });
 
   describe("Admin Functions", function () {
+    it("Should append missing trailing slash on base URI", async function () {
+      const newURI = "https://new-uri.com";
+      await nftContract.connect(owner).setBaseURI(newURI);
+      expect(await nftContract.uri(COMMANDER_TOKEN_ID)).to.equal(
+        `${newURI}/${COMMANDER_TOKEN_ID}.json`
+      );
+    });
+
     it("Should allow admin to update rank config", async function () {
       const newConfig = {
         seriesCode: "GC5",
@@ -209,17 +217,86 @@ describe("SusumiPioneerNFT", function () {
     });
 
     it("Should allow admin to set default royalty", async function () {
-      await nftContract.connect(owner).setDefaultRoyalty(treasury.address, 1000); // 10%
-      // Royalty info is internal, but we can verify it doesn't revert
-      expect(await nftContract.hasRole(await nftContract.ADMIN_ROLE(), owner.address)).to.be.true;
+      await expect(
+        nftContract.connect(owner).setDefaultRoyalty(treasury.address, 1000)
+      )
+        .to.emit(nftContract, "DefaultRoyaltyUpdated")
+        .withArgs(treasury.address, 1000);
     });
 
     it("Should allow admin to set token-specific royalty", async function () {
-      await nftContract
-        .connect(owner)
-        .setTokenRoyalty(COMMANDER_TOKEN_ID, treasury.address, 750); // 7.5%
-      // Royalty info is internal, but we can verify it doesn't revert
-      expect(await nftContract.hasRole(await nftContract.ADMIN_ROLE(), owner.address)).to.be.true;
+      await expect(
+        nftContract
+          .connect(owner)
+          .setTokenRoyalty(COMMANDER_TOKEN_ID, treasury.address, 750)
+      )
+        .to.emit(nftContract, "TokenRoyaltyUpdated")
+        .withArgs(COMMANDER_TOKEN_ID, treasury.address, 750);
+    });
+  });
+
+  describe("Metadata Freeze", function () {
+    it("Should freeze metadata and block admin mutations", async function () {
+      await nftContract.connect(owner).freezeMetadata();
+      const frozenConfig = {
+        seriesCode: "GC5",
+        rankTitle: "Commander",
+        veTier: 1,
+        fundAccess: 2,
+        isValidator: true,
+        l1Share: 0,
+        l2Share: 0,
+        l3Share: 0,
+      };
+      await expect(
+        nftContract.connect(owner).setBaseURI("https://blocked.com/")
+      ).to.be.revertedWith("Metadata frozen");
+      await expect(
+        nftContract.connect(owner).updateRankConfig(COMMANDER_TOKEN_ID, frozenConfig)
+      ).to.be.revertedWith("Metadata frozen");
+      await expect(
+        nftContract.connect(owner).setDefaultRoyalty(treasury.address, 500)
+      ).to.be.revertedWith("Metadata frozen");
+      await expect(
+        nftContract.connect(owner).setTokenRoyalty(COMMANDER_TOKEN_ID, treasury.address, 500)
+      ).to.be.revertedWith("Metadata frozen");
+    });
+  });
+
+  describe("Rescue", function () {
+    it("Should rescue ERC20 tokens to admin", async function () {
+      const MockUSDT = await ethers.getContractFactory("MockUSDT");
+      const token = await MockUSDT.deploy();
+      await token.waitForDeployment();
+      const tokenAddress = await token.getAddress();
+
+      // send tokens to contract
+      await token.mint(nftContract.target, 1000);
+      const adminBalanceBefore = await token.balanceOf(owner.address);
+
+      await expect(nftContract.connect(owner).rescue(tokenAddress))
+        .to.emit(nftContract, "Rescue")
+        .withArgs(tokenAddress, 1000);
+
+      const adminBalanceAfter = await token.balanceOf(owner.address);
+      expect(adminBalanceAfter - adminBalanceBefore).to.equal(1000);
+    });
+
+    it("Should rescue native balance to admin", async function () {
+      // force balance by setting it directly (no receive function on contract)
+      await ethers.provider.send("hardhat_setBalance", [
+        nftContract.target,
+        "0x4563918244F40000", // 5 ETH
+      ]);
+      const adminBalanceBefore = BigInt(await ethers.provider.getBalance(owner.address));
+
+      const tx = await nftContract.connect(owner).rescue(ethers.ZeroAddress);
+      const receipt = await tx.wait();
+      const gasPrice = receipt.effectiveGasPrice ?? tx.gasPrice ?? 0;
+      const gasUsed = BigInt(receipt.gasUsed) * BigInt(gasPrice);
+      const adminBalanceAfter = BigInt(await ethers.provider.getBalance(owner.address));
+
+      expect(adminBalanceAfter + gasUsed - adminBalanceBefore).to.equal(5n * ethers.WeiPerEther);
     });
   });
 

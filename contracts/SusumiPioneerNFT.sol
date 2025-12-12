@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/token/common/ERC2981.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
@@ -16,6 +18,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  */
 contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pausable {
     using Strings for uint256;
+    using SafeERC20 for IERC20;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -61,6 +64,12 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
 
     event RankConfigUpdated(uint256 indexed tokenId, RankConfig config);
     event BaseURIUpdated(string newBaseURI);
+    event DefaultRoyaltyUpdated(address receiver, uint96 feeNumerator);
+    event TokenRoyaltyUpdated(uint256 indexed tokenId, address receiver, uint96 feeNumerator);
+    event Rescue(address token, uint256 amount);
+    event MetadataFrozen();
+
+    bool public metadataFrozen;
 
     /**
      * @dev Constructor initializes the contract with admin roles and default royalty
@@ -77,7 +86,7 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(ADMIN_ROLE, defaultAdmin);
         _setDefaultRoyalty(treasury, 500); // 5% royalty (500 basis points)
-        _baseURI = baseURI_;
+        _baseURI = _normalizeBaseURI(baseURI_);
         _initializeRankConfigs();
     }
 
@@ -256,6 +265,7 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
      */
     function updateRankConfig(uint256 id, RankConfig calldata config) external onlyRole(ADMIN_ROLE) {
         if (!_isValidTokenId(id)) revert InvalidTokenId();
+        _requireNotFrozen();
         _rankConfigs[id] = config;
         emit RankConfigUpdated(id, config);
     }
@@ -265,8 +275,18 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
      * @param baseURI_ New base URI string
      */
     function setBaseURI(string memory baseURI_) external onlyRole(ADMIN_ROLE) {
-        _baseURI = baseURI_;
+        _requireNotFrozen();
+        _baseURI = _normalizeBaseURI(baseURI_);
         emit BaseURIUpdated(baseURI_);
+    }
+
+    /**
+     * @dev One-way metadata freeze to lock admin mutations
+     */
+    function freezeMetadata() external onlyRole(ADMIN_ROLE) {
+        _requireNotFrozen();
+        metadataFrozen = true;
+        emit MetadataFrozen();
     }
 
     /**
@@ -298,7 +318,9 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
      * @param feeNumerator Royalty fee in basis points (e.g., 500 = 5%)
      */
     function setDefaultRoyalty(address receiver, uint96 feeNumerator) external onlyRole(ADMIN_ROLE) {
+        _requireNotFrozen();
         _setDefaultRoyalty(receiver, feeNumerator);
+        emit DefaultRoyaltyUpdated(receiver, feeNumerator);
     }
 
     /**
@@ -312,7 +334,35 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
         address receiver,
         uint96 feeNumerator
     ) external onlyRole(ADMIN_ROLE) {
+        _requireNotFrozen();
         _setTokenRoyalty(tokenId, receiver, feeNumerator);
+        emit TokenRoyaltyUpdated(tokenId, receiver, feeNumerator);
+    }
+
+    /**
+     * @dev Rescue native or ERC20 tokens sent to the contract (admin only)
+     */
+    function rescue(address token) external onlyRole(ADMIN_ROLE) {
+        uint256 amount;
+        if (token == address(0)) {
+            bool success;
+            amount = address(this).balance;
+            (success, ) = address(_msgSender()).call{value: amount}("");
+        } else {
+            amount = IERC20(token).balanceOf(address(this));
+            require(amount > 0, "No tokens");
+            IERC20(token).safeTransfer(_msgSender(), amount);
+        }
+        emit Rescue(token, amount);
+    }
+
+    /**
+     * @dev Override supportsInterface for ERC1155, ERC2981, and AccessControl
+     */
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC1155, ERC2981, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 
     /**
@@ -322,6 +372,21 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
      */
     function _isValidTokenId(uint256 id) private pure returns (bool) {
         return id == COMMANDER_TOKEN_ID || id == COUNSELLOR_TOKEN_ID || id == CHANCELLOR_TOKEN_ID;
+    }
+
+    function _requireNotFrozen() private view {
+        require(!metadataFrozen, "Metadata frozen");
+    }
+
+    function _normalizeBaseURI(string memory baseURI_) private pure returns (string memory) {
+        bytes memory uriBytes = bytes(baseURI_);
+        if (uriBytes.length == 0) {
+            return "";
+        }
+        if (uriBytes[uriBytes.length - 1] == "/") {
+            return baseURI_;
+        }
+        return string(abi.encodePacked(baseURI_, "/"));
     }
 
     /**
@@ -334,14 +399,5 @@ contract SusumiPioneerNFT is ERC1155, ERC1155Supply, ERC2981, AccessControl, Pau
         uint256[] memory values
     ) internal override(ERC1155, ERC1155Supply) whenNotPaused {
         super._update(from, to, ids, values);
-    }
-
-    /**
-     * @dev Override supportsInterface for ERC1155, ERC2981, and AccessControl
-     */
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override(ERC1155, ERC2981, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
     }
 }
