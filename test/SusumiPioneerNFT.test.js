@@ -9,7 +9,7 @@ describe("SusumiPioneerNFT", function () {
   const COUNSELLOR_TOKEN_ID = 10001;
   const CHANCELLOR_TOKEN_ID = 12001;
   
-  const BASE_URI = "https://gateway.pinata.cloud/ipfs/QmZtXU5vHrdtHpxckfHz4ZYQkE3qTqbhwNYCNkwdipARMj/";
+  const BASE_URI = "https://gateway.pinata.cloud/ipfs/bafybeigbyberieowlnhgasp4e72qkcpbiytsgxljgutv3qi4tlcr4eqczu/";
 
   beforeEach(async function () {
     [owner, treasury, minter, user1, user2] = await ethers.getSigners();
